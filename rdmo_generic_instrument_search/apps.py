@@ -7,7 +7,7 @@ from .config_utils import load_config_from_settings
 class InstrumentSearchConfig(AppConfig):
     name = "rdmo_generic_instrument_search"
     label = "rdmo_generic_instrument_search"
-    verbose_name = "Instrument Search OptionSet Plugin"
+    verbose_name = "Instrument Search OptionSet Provider Plugin"
     config = None
 
     def ready(self):

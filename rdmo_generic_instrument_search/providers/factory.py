@@ -4,38 +4,48 @@ from django.utils.module_loading import import_string
 
 from rdmo_generic_instrument_search.config_utils import load_config_from_settings
 
-from .registry import PROVIDER_REGISTRY
+from .recipe import DetailStep, RecipeInstrumentProvider, SearchSpec, TransformSpec
 
+PROVIDER_REGISTRY = {
+    "GenericRecipeProvider": RecipeInstrumentProvider,
+}
 CONFIG_KEY = "InstrumentsOptionSetProvider"
 
 
 def _resolve(name: str, dotted: str | None):
-    return import_string(dotted) if dotted else PROVIDER_REGISTRY[name]
+    return import_string(dotted) if dotted else PROVIDER_REGISTRY.get(name, RecipeInstrumentProvider)
 
 
 def build_providers() -> dict[str, object]:
-    """Return {id_prefix: provider_instance} for fast lookup in handlers."""
-    cfg = load_config_from_settings().get(CONFIG_KEY, {}) or {}
-    instances: dict[str, object] = {}
-
+    cfg = load_config_from_settings().get("InstrumentsOptionSetProvider", {}) or {}
+    result: dict[str, object] = {}
     for class_name, entries in (cfg.get("providers") or {}).items():
         for raw in entries:
-            params = dict(raw)
-            dotted = params.pop("class", None)
+            data = dict(raw)
+            dotted = data.pop("class", None)
             cls = _resolve(class_name, dotted)
-            # Map recipe structures if present
-            recipe_search = params.pop("search", None)
-            recipe_detail = params.pop("detail", {}).get("requests", None)
-
-            prov = cls(**params)  # id_prefix, base_url, text_prefix, max_hits...
-            if recipe_search and hasattr(prov, "recipe_search"):
-                prov.recipe_search = recipe_search
-            if recipe_detail and hasattr(prov, "recipe_detail"):
-                from .recipe import RequestSpec
-
-                prov.recipe_detail = [
-                    RequestSpec(url=r["url"], into=r.get("into", "$"), merge_included=bool(r.get("merge", {}).get("included")))
-                    for r in recipe_detail
+            prov_kwargs = {k: v for k, v in data.items() if k not in ("search", "detail", "transforms")}
+            prov = cls(**prov_kwargs)
+            # recipe wiring
+            if isinstance(prov, RecipeInstrumentProvider):
+                search = data.get("search")
+                if search:
+                    prov.search_spec = SearchSpec(
+                        mode=search["mode"],
+                        url=search.get("url", ""),
+                        items_path=search.get("items_path"),
+                        id_path=search.get("id_path"),
+                        label_path=search.get("label_path"),
+                        label_template=search.get("label_template"),
+                        filter_any_paths=search.get("filter_any_paths"),
+                    )
+                detail = data.get("detail", {})
+                prov.detail_steps = [
+                    DetailStep(url=st["url"], merge_included=bool(st.get("merge_included")), assign=st.get("assign"))
+                    for st in detail.get("steps", [])
                 ]
-            instances[prov.id_prefix] = prov
-    return instances
+                prov.transforms = [
+                    TransformSpec(dotted=t["dotted"], kwargs=t.get("kwargs")) for t in (detail.get("transforms") or [])
+                ]
+            result[prov.id_prefix] = prov
+    return result

@@ -37,7 +37,10 @@ def _load_config_with_mtime(path: Path, mtime: float) -> dict[str, Any]:
     logger.debug("Loading configuration from %s", path)
     try:
         with open(path, "rb") as config_file:
-            return tomllib.load(config_file)
+            config_data = tomllib.load(config_file)
+        if not config_data:
+            raise ValueError("Config from %s is empty", path)
+        return config_data
     except (FileNotFoundError, PermissionError) as e:
         logger.error("Cannot open configuration file: %s", path)
         raise e from e

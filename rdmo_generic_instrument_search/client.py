@@ -1,5 +1,4 @@
 import logging
-from functools import cache
 
 from django.conf import settings
 
@@ -25,7 +24,6 @@ def fetch_json(url: str) -> dict | list:
         return {"errors": [str(e)]}
 
 
-@cache
 def get_user_agent(app_config) -> str:
     """
     Constructs a standardized user agent string for backend HTTP requests.

@@ -41,9 +41,9 @@ class TransformSpec:
 
 class RecipeInstrumentProvider(BaseInstrumentProvider):
     # injected from config
-    search_spec: SearchSpec | None = None
-    detail_steps: list[DetailStep] | None = None
-    transforms: list[TransformSpec] | None = None
+    search_spec: SearchSpec | dict | None = None
+    detail_steps: list[DetailStep] | list[dict] | None = None
+    transforms: list[TransformSpec] | list[dict] | None = None
 
     def search(self, query: str) -> list[dict]:
         if not self.search_spec or not query:

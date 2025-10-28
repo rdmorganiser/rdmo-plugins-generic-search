@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from urllib.parse import quote
 
-from rdmo_generic_instrument_search.client import fetch_json  # your client, UA-aware
+from rdmo_generic_instrument_search.client import fetch_json
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(kw_only=True, slots=True)
 class BaseInstrumentProvider:
+    # required
     id_prefix: str
-    text_prefix: str | None = None
     base_url: str
+
+    # optional
+    text_prefix: str | None = None
     max_hits: int = 10
 
-    # Template hooks
+    # Template hooks (stay optional; not required in __init__)
     search_url: str | None = None  # e.g. "{base_url}/devices?q={query}"
     search_items_path: str | None = None  # e.g. "data"
     search_id_path: str | None = None  # e.g. "id"
@@ -32,11 +37,13 @@ class BaseInstrumentProvider:
             label = self._jp(self.search_label_path, it)
             if not rid or not label:
                 continue
-            out.append({"id": f"{self.id_prefix}:{rid}", "text": f"{(self.text_prefix or '').strip()} {label}".strip()})
+            prefix = (self.text_prefix or "").strip()
+            text = f"{prefix} {label}".strip() if prefix else str(label)
+            out.append({"id": f"{self.id_prefix}:{rid}", "text": text})
         return out
 
     def detail(self, remote_id: str) -> dict:
-        # default: child classes or RecipeProvider override
+        # subclasses or the recipe provider override this
         return {}
 
     @staticmethod

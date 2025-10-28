@@ -19,7 +19,6 @@ def handle_post_save(instance):
     cat_uri = instance.project.catalog.uri
     attr_uri = instance.attribute.uri
     candidates = ALL.get(cat_uri, [])
-
     matched = False
     for c in candidates:
         if c.id_prefix == id_prefix and c.auto_complete_field_uri == attr_uri:
