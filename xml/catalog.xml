@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rdmo xmlns:dc="http://purl.org/dc/elements/1.1/" created="2025-10-20T12:00:00+01:00" version="2.3.2">
-	<catalog dc:uri="http://example.com/terms/questions/search/instrument/example">
+<rdmo xmlns:dc="http://purl.org/dc/elements/1.1/" created="2025-10-20T12:00:00+01:00" required="2.1.0" version="2.3.2">
+	<catalog dc:uri="http://example.com/terms/questions/generic-instrument-search-example-catalog">
 		<uri_prefix>http://example.com/terms</uri_prefix>
-		<uri_path>search/instrument/example</uri_path>
+		<uri_path>generic-instrument-search-example-catalog</uri_path>
 		<dc:comment>Example catalog for the Instrument search optionset provider plugin</dc:comment>
 		<order>0</order>
 		<title lang="en">Instrument search Example Catalog</title>
@@ -140,7 +140,7 @@
 		<verbose_name lang="de"/>
 		<default_option/>
 		<default_external_id/>
-		<widget_type>autocomplete</widget_type>
+		<widget_type>select</widget_type>
 		<value_type>text</value_type>
 		<maximum/>
 		<minimum/>
