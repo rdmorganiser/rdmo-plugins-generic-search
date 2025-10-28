@@ -1,22 +1,12 @@
-<!--
-SPDX-FileCopyrightText: 2023 - 2024 Hannes Fuchs (GFZ) <hfuchs@gfz-potsdam.de>
-SPDX-FileCopyrightText: 2023 - 2024 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
+# RDMO Instrument search optionset provider
 
-SPDX-License-Identifier: Apache-2.0
--->
-
-# RDMO Sensor Search option set plugin
-
-This option set plugin allows you to query several sensor registries at the
+This optionset provider allows you to query several instrument databases at the
 same time. Additional questions can be filled in automatically with informations
-from the sensor registries. To use this feature an attribute mapping must be
+from the instrument database entries. To use this feature an attribute mapping must be
 configured.
 
-The following sensor registries are currently implemented:
-- [Geophysical Instrument Pool Potsdam (GIPP)](https://gipp.gfz-potsdam.de/)
-- [O2A Registry](https://registry.o2a-data.de/)
-- [Sensor Management System](https://codebase.helmholtz.cloud/hub-terra/sms/service-desk/-/wikis/home)
-
+The following instrument databases are currently implemented:
+    -...
 For every integration it is possible to define multiple instances in the
 configuration. This is especially necessary for the Sensor Management System
 (SMS), since there are four productive instances.
@@ -45,72 +35,54 @@ Add the plugin to the `OPTIONSET_PROVIDERS` in `config/settings/local.py`:
 
 ```python
 OPTIONSET_PROVIDERS = [
-    ('sensorssearch', _('Sensor Search'), 'rdmo_sensorsearch.providers.SensorsProvider'),
+    ('instrument_search', _('Instrument search'), 'rdmo_generic_instrument_search.providers.InstrumentsOptionSetProvider'),
 ]
 ```
 
 Add the plugin to the `INSTALLED_APPS` in `config/settings/local.py`:
 
 ```python
-INSTALLED_APPS = ['rdmo_sensorsearch'] + INSTALLED_APPS
+INSTALLED_APPS = ['rdmo_generic_instrument_search'] + INSTALLED_APPS
 ```
 
-After restarting RDMO, the `Sensor Search` should be selectable as a provider
-option for option sets.
+After restarting RDMO, the `Instrument search` should be selectable as a provider
+option for optionsets.
 
 ## Configuration
 
 With `config.toml` the providers which should be used can be configured. The
-`SensorsProvider` aggregates the results of the configured providers.
+`InstrumentsOptionSetProvider` aggregates the results of the configured providers.
 
 To automatically fill out questions with results of the matching sensor,
 attribute mapping for the specific catalog(s) must be configured in the
 configuration file.
 
 The configuration file default location is inside the directory of the plugin.
-The location can be overwritten with `SENSORS_SEARCH_PROVIDER_CONFIG_FILE_PATH`
+The location can be overwritten with `INSTRUMENT_SEARCH_PROVIDER_CONFIG_FILE_PATH`
 in the in `config/settings/local.py` or as environment variable with the same
 name.
+
+```python
+INSTRUMENT_SEARCH_PROVIDER_CONFIG_FILE_PATH = BASE_DIR / 'plugins' / 'instrument_search_config.toml'
+```
 
 ### Configuration: Providers
 
 ```toml
-[SensorsProvider]
+[InstrumentsOptionSetProvider]
 min_search_len = 3 
 
-[[SensorsProvider.providers.O2ARegistrySearchProvider]]
 
-[[SensorsProvider.providers.SensorManagementSystemProvider]]
-id_prefix = "gfzsms" 
-text_prefix = "GFZ Sensors:" 
-base_url = "https://sensors.gfz-potsdam.de/backend/api/v1/devices"
-
-[[SensorsProvider.providers.SensorManagementSystemProvider]]
-id_prefix = "kitsms"
-text_prefix = "KIT Sensors:"
-base_url = "https://sms.atmohub.kit.edu/backend/rdm/svm-api/v1/devices"
-
-[[SensorsProvider.providers.SensorManagementSystemProvider]]
-id_prefix = "ufzsms"
-text_prefix = "UFZ Sensors:"
-base_url = "https://web.app.ufz.de/sms/backend/api/v1/devices"
-
-[[SensorsProvider.providers.GeophysicalInstrumentPoolPotsdamProvider]]
+[[InstrumentsOptionSetProvider.providers.ExampleInstrumentProvider]]
+id_prefix = "example" 
+text_prefix = "Example: " 
+base_url = "https://example.com/api/v1/instruments"
 ```
 
-This configures all available providers with three SMS instances to query. The
-`SensorsProvider` will only query the configured providers if at least three
-characters are entered.
-
-The `O2ARegistrySearchProvider` and `GeophysicalInstrumentPoolPotsdamProvider`
-uses their default values for `id_prefix`, `text_prefix`, `base_url` and
-`max_hits`.
-
-There is no default `base_url` for `SensorManagementSystemProvider` defined,
-therefore the `base_url` for every instance must be set. In addition the
+A `base_url` for every instance must be set. In addition, the
 `text_prefix` and `id_prefix` is configured. The `text_prefix` is displayed
-before the result, so that the user can identify the correct registry and
-sensor. The `id_prefix` is used internally, to prefix the id which is saved
+as a prefix to the search result, so that the user can identify the correct source.
+The `id_prefix` is used internally, to prefix the id which is saved
 along the value in `external_id`. This is used by the handler to query the
 correct registry when filling out questions with attribute mapping
 automatically.
@@ -121,59 +93,34 @@ In conclusion, every provider has the following options:
   registry
 - `max_hits` defaults to `10` and limits the results to display
 - `base_url` the API URL of the used instance, must be set for the
-  `SensorManagementSystemProvider`
+  `InstrumentsOptionSetProvider`
 
 ### Configuration: Handlers
 
-Handlers can be used to fill out questions automatically with the use of a
-configured attribute mapping. For every provider a handler is implemented,
-which can request additional information from the registry to answer questions.
+Handlers, or signal handlers, can be used to fill out questions with the search result 
+automatically via a pre-configured attribute mapping. 
+For every provider a handler is implemented,
+which can request additional information from the database to answer questions.
 
-For every catalog, which should use handlers, the catalog must be configured
-and the attribute mapping for every provider must also be configured. 
+The catalog must be configured to be able to use the handlers and each provider must also
+configure an attribute mapping.
 
 ```toml
-[handlers.O2ARegistrySearchHandler]
-#[[handlers.O2ARegistrySearchHandler.backends]]
-#id_prefix = "o2aregistry"
-[[handlers.O2ARegistrySearchHandler.catalogs]]
-catalog_uri = "http://rdmo-dev.local/terms/questions/sensor-awi-test"
-auto_complete_field_uri = "http://rdmo-dev.local/terms/domain/sensor/awi/search"
-[handlers.O2ARegistrySearchHandler.catalogs.attribute_mapping]
-"longName" = "http://rdmo-dev.local/terms/domain/sensor/awi/type-name"
-"shortName" = "http://rdmo-dev.local/terms/domain/sensor/awi/name"
-"serialNumber" = "http://rdmo-dev.local/terms/domain/sensor/awi/serial"
-
-[handlers.SensorManagementSystemHandler]
-[[handlers.SensorManagementSystemHandler.backends]]
-id_prefix = "gfzsms" 
-base_url = "https://sensors.gfz-potsdam.de/backend/api/v1"
-[[handlers.SensorManagementSystemHandler.backends]]
-id_prefix = "kitsms"
-base_url = "https://sms.atmohub.kit.edu/backend/rdm/svm-api/v1"
-[[handlers.SensorManagementSystemHandler.backends]]
-id_prefix = "ufzsms"
-base_url = "https://web.app.ufz.de/sms/backend/api/v1"
-[[handlers.SensorManagementSystemHandler.catalogs]]
-catalog_uri = "http://rdmo-dev.local/terms/questions/sensor-awi-test"
-auto_complete_field_uri = "http://rdmo-dev.local/terms/domain/sensor/awi/search"
-[handlers.SensorManagementSystemHandler.catalogs.attribute_mapping]
-"data.attributes.long_name" = "http://rdmo-dev.local/terms/domain/sensor/awi/type-name"
-"data.attributes.short_name" = "http://rdmo-dev.local/terms/domain/sensor/awi/name"
-"data.attributes.serial_number" = "http://rdmo-dev.local/terms/domain/sensor/awi/serial"
-
-[handlers.GeophysicalInstrumentPoolPotsdamHandler]
-[[handlers.GeophysicalInstrumentPoolPotsdamHandler.catalogs]]
-catalog_uri = "http://rdmo-dev.local/terms/questions/sensor-awi-test"
-auto_complete_field_uri = "http://rdmo-dev.local/terms/domain/sensor/awi/search"
-[handlers.GeophysicalInstrumentPoolPotsdamHandler.catalogs.attribute_mapping]
-"Instrument.code" = "http://rdmo-dev.local/terms/domain/sensor/awi/type-name"
-"Instrumentcategory.name" = "http://rdmo-dev.local/terms/domain/sensor/awi/name"
-"Instrument.serialNo" = "http://rdmo-dev.local/terms/domain/sensor/awi/serial"
+[handlers.ExampleInstrumentSearchHandler]
+[[handlers.ExampleInstrumentSearchHandler.backends]]
+id_prefix = "example" 
+base_url = "https://example.com/api/v1/instruments"
+[[handlers.ExampleInstrumentSearchHandler.catalogs]]
+catalog_uri = "http://example.com/terms/questions/test-instrument-search"
+auto_complete_field_uri = "http://example.com/terms/domain/search/instrument/example"
+[handlers.ExampleInstrumentSearchHandler.catalogs.attribute_mapping]
+"longName" = "http://example.com/terms/domain/search/instrument/example/long-name"
+"shortName" =  "http://example.com/terms/domain/search/instrument/example/short-name"
+"serialNumber" =  "http://example.com/terms/domain/search/instrument/example/serial"
 ```
 
 A `backends` configuration must be defined in the case of
-`SensorManagementSystemHandler` or if more than one instance of one provider is
+`ExampleInstrumentSearchHandler` or if more than one instance of one provider is
 used. Here the `id_prefix` and the `base_url` is critical and must be the same
 as in the `providers` configuration, so that additional requests can be made
 to the correct endpoint.
