@@ -1,42 +1,48 @@
-# SPDX-FileCopyrightText: 2024 Hannes Fuchs (GFZ) <hannes.fuchs@gfz-potsdam.de>
-# SPDX-FileCopyrightText: 2024 Helmholtz Centre Potsdam - GFZ German Research Centre for Geosciences
-#
-# SPDX-License-Identifier: Apache-2.0
-
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
+requires = ["setuptools", "wheel"]
 
 [project]
-name = "rdmo-plugins-sensorsearch"
+name = "rdmo-plugins-generic-instrument-search"
+license = {text = "Apache-2.0"}
 authors = [
-    {name = "Hannes Fuchs", email = "hannes.fuchs@gfz-potsdam.de"},
+  {name = "RDMO. Research Data Management Organiser e.V.", email = "rdmo-contact@listserv.dfn.de"},
 ]
-maintainers = [
-    {name = "Hannes Fuchs", email = "hannes.fuchs@gfz-potsdam.de"},
-]
-description = "Option set plugin to search through various sensor management systems"
+description = "A generic OptionSet Provider Plugin to search for instruments."
 readme = "README.md"
-requires-python = ">=3.8"
-license = {file = "LICENSE"}
+requires-python = ">=3.10"
+classifiers = [
+  "Environment :: Web Environment",
+  "Framework :: Django :: 4.2",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dynamic = ["version"]
 dependencies = [
     "jmespath>=1.0.1",
     "requests>=2.31",
 	"tomli>=2.0.1;python_version<'3.11'"
 ]
-dynamic = ["version"]
+
 
 [project.urls]
-repository = "https://github.com/rdmorganiser/rdmo-plugins-sensorsearch"
+repository = "https://github.com/rdmorganiser/rdmo-plugins-generic-instrument-search"
 
 [tool.setuptools]
-packages = ["rdmo_sensorsearch"]
+packages = ["rdmo_generic_instrument_search"]
 
 [tool.setuptools.dynamic]
-version = {attr = "rdmo_sensorsearch.__version__"}
+version = {attr = "rdmo_generic_instrument_search.__version__"}
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py310"
 line-length = 120
 select = [
   "B",    # flake8-bugbear
