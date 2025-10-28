@@ -5,7 +5,7 @@ from django.dispatch import receiver
 
 from rdmo.projects.models import Value
 
-from rdmo_sensorsearch.signals.handler_post_save import handle_post_save
+from rdmo_generic_instrument_search.signals.handler_post_save import handle_post_save
 
 logger = logging.getLogger(__name__)
 

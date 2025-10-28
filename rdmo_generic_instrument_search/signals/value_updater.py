@@ -7,6 +7,13 @@ from rdmo.questions.models import Question, QuestionSet
 logger = logging.getLogger(__name__)
 
 
+def _normalize(v):
+    # Preserve numbers/bools; stringify others
+    if isinstance(v, (int | float | bool)):
+        return v
+    return v if v is None else str(v)
+
+
 def update_values_from_mapped_data(instance, data: dict):
     for attribute_uri, value in data.items():
         if value is None:
@@ -20,11 +27,19 @@ def update_values_from_mapped_data(instance, data: dict):
         if isinstance(value, list):
             _handle_list_value(instance, attribute, value)
         else:
+            val_norm = _normalize(value)
+            current = Value.objects.filter(
+                project=instance.project,
+                attribute=attribute,
+                set_index=instance.set_index,
+            ).first()
+            if current and (current.text == val_norm or current.value == val_norm):
+                continue
             Value.objects.update_or_create(
                 project=instance.project,
                 attribute=attribute,
                 set_index=instance.set_index,
-                defaults={"text": value},
+                defaults={"text": val_norm},
             )
 
 
