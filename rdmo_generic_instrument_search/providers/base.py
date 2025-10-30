@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import quote
 
 from rdmo_generic_instrument_search.client import fetch_json
@@ -16,14 +16,14 @@ class BaseInstrumentProvider:
     base_url: str
 
     # optional
-    text_prefix: str | None = None
-    max_hits: int = 10
+    text_prefix: str | None = field(default=None, repr=False)
+    max_hits: int = field(default=10, repr=False)
 
     # Template hooks (stay optional; not required in __init__)
-    search_url: str | None = None  # e.g. "{base_url}/devices?q={query}"
-    search_items_path: str | None = None  # e.g. "data"
-    search_id_path: str | None = None  # e.g. "id"
-    search_label_path: str | None = None  # e.g. "attributes.long_name"
+    search_url: str | None = field(default=None, repr=False)  # e.g. "{base_url}/devices?q={query}"
+    search_items_path: str | None = field(default=None, repr=False)  # e.g. "data"
+    search_id_path: str | None = field(default=None, repr=False)  # e.g. "id"
+    search_label_path: str | None = field(default=None, repr=False)  # e.g. "attributes.long_name"
 
     def search(self, query: str) -> list[dict]:
         if not self.search_url:

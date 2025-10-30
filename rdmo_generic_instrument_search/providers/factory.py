@@ -30,15 +30,7 @@ def build_providers() -> dict[str, object]:
             if isinstance(prov, RecipeInstrumentProvider):
                 search = data.get("search")
                 if search:
-                    prov.search_spec = SearchSpec(
-                        mode=search["mode"],
-                        url=search.get("url", ""),
-                        items_path=search.get("items_path"),
-                        id_path=search.get("id_path"),
-                        label_path=search.get("label_path"),
-                        label_template=search.get("label_template"),
-                        filter_any_paths=search.get("filter_any_paths"),
-                    )
+                    prov.search_spec = SearchSpec.from_dict(search)
                 detail = data.get("detail", {})
                 prov.detail_steps = [
                     DetailStep(url=st["url"], merge_included=bool(st.get("merge_included")), assign=st.get("assign"))

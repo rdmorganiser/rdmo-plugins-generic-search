@@ -16,7 +16,7 @@ _PROVIDERS_BY_PREFIX = build_providers()
 _ALL_PROVIDERS = list(_PROVIDERS_BY_PREFIX.values())
 
 
-class InstrumentOptionsetProvider(Provider):
+class InstrumentOptionSetProvider(Provider):
     """RDMO optionset provider that fans out search to all configured backends."""
 
     search = True
@@ -40,7 +40,7 @@ class InstrumentOptionsetProvider(Provider):
                 try:
                     opts = f.result() or []
                 except Exception as exc:
-                    logger.warning("Provider %s.search failed: %s", prov.__class__.__name__, exc)
+                    logger.warning("Provider %s.search failed: %s", prov, exc)
                     continue
                 for opt in opts:
                     oid = str(opt.get("id"))

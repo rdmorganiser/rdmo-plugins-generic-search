@@ -1,1 +1,1 @@
-from .meta import InstrumentOptionsetProvider as InstrumentOptionsetProvider
+from .meta import InstrumentOptionSetProvider as InstrumentOptionSetProvider
