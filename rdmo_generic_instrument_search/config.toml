@@ -1,21 +1,194 @@
-[GenericSearchProvider]
-min_search_len = 3
+# -------------------------------------------------------------------
+# Generic Instrument Search – canonical config (schema v1)
+# -------------------------------------------------------------------
+[generic_search]
+schema_version = 1
 
-[[GenericSearchProvider.providers.ExampleInstrumentProvider]]
-id_prefix = "example"
-text_prefix = "Example: "
-base_url = "https://example.com/api/v1/instruments"
+# UX & performance knobs
+min_search_len = 3              # ignore queries shorter than this
+max_workers    = 6              # thread-pool size (I/O bound)
+max_total_hits = 50             # stop merging once total options reach this
+sort_key       = "text"         # "text"|"id"|"" (keep as-completed order)
 
-[handlers.ExampleInstrumentSearchHandler]
-[[handlers.ExampleInstrumentSearchHandler.backends]]
-id_prefix = "example"
-base_url = "https://example.com/api/v1/instruments"
+# Defaults for built-in "recipe" providers (merged into each provider)
+[generic_search.defaults.recipe]
+max_hits = 10                   # cap items mapped to options per provider
+lang     = "en"                 # default language for SPARQL etc.
 
-[[handlers.ExampleInstrumentSearchHandler.catalogs]]
+# Optional shared auth blocks (reference via providers[*].auth_ref)
+# [generic_search.auth.my_token]
+# type   = "header"             # "basic" | "header" | "query"
+# header = "Authorization"
+# value  = "Bearer ${INSTRUMENT_API_TOKEN}"   # env expansion supported by loader
+
+
+# ===================================================================
+# Handlers – map a provider’s detail document to RDMO attributes
+# ===================================================================
+# Use either a single inline config per handler family, or an array of configs:
+#   [generic_search.handlers.<name>]               # single config
+#   [[generic_search.handlers.<name>.config]]      # multiple configs
+#
+# Each config requires:
+#   - name (matched against "id_prefix" part of external_id)
+#   - catalog_uri (the target catalog)
+#   - auto_complete_field_uri (the question used for the search widget)
+#   - attribute_mapping (JMESPath -> attribute URI)
+#
+[generic_search.handlers.o2areg]                   # handler "o2areg"
+name = "o2areg"
+catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
+auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
+
+[generic_search.handlers.o2areg.attribute_mapping]
+"longName"          = "https://rdmorganiser.github.io/terms/domain/project/dataset/description"
+"shortName"         = "https://rdmorganiser.github.io/terms/domain/project/dataset/documentation"
+"serialNumber"      = "https://rdmorganiser.github.io/terms/domain/project/dataset/id"
+"parameters[].name" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_description"
+"parameters[].unit" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_frequency"
+
+# Example handler with array fields (shows how [] in mapping becomes list handling)
+[generic_search.handlers.example]
+name = "example"
 catalog_uri = "http://example.com/terms/questions/test-instrument-search"
 auto_complete_field_uri = "http://example.com/terms/domain/search/instrument/example"
 
-[handlers.ExampleInstrumentSearchHandler.catalogs.attribute_mapping]
-"longName" = "http://example.com/terms/domain/search/instrument/example/long-name"
-"shortName" =  "http://example.com/terms/domain/search/instrument/example/short-name"
-"serialNumber" =  "http://example.com/terms/domain/search/instrument/example/serial"
+[generic_search.handlers.example.attribute_mapping]
+"longName"      = "http://example.com/terms/domain/search/instrument/example/long-name"
+"shortName"     = "http://example.com/terms/domain/search/instrument/example/short-name"
+"serialNumber"  = "http://example.com/terms/domain/search/instrument/example/serial"
+"aliases[]"     = "http://example.com/terms/domain/search/instrument/example/aliases"   # -> list
+"keywords[]"    = "http://example.com/terms/domain/search/instrument/example/keywords"  # -> list
+
+
+# ===================================================================
+# Providers – search + detail + transforms (engine="recipe")
+# ===================================================================
+# Each provider must define:
+#   - id_prefix       short key that prefixes external_id (e.g. "o2areg:1234")
+#   - engine          currently only "recipe" is supported
+#   - base_url/text_prefix/max_hits (optional overrides)
+#   - [search]        mode + mapping from raw items to {id,text}
+#   - [detail]        one or more HTTP steps; optional transforms
+#   - [handler]       optional link to a handler by name (docs only; resolution is done at signal time)
+
+# --- O2A Registry (server search + multi-step detail + transforms) -----------
+[[generic_search.providers]]
+id_prefix   = "o2areg"
+engine      = "recipe"
+text_prefix = "O2A REGISTRY:"
+base_url    = "https://registry.o2a-data.de"
+# auth_ref  = "my_token"        # uncomment if using the shared auth block
+
+[generic_search.providers.search]
+mode           = "server"
+url            = "{base_url}/index/rest/search/sensor-v2?q=(title:({query}*)^2 OR id:(/{query}/)^20 OR ({query}*)^0) AND (states.itemState:(public devicestore)^0)&hits=10"
+items_path     = "records"
+id_path        = "uniqueId"
+label_path     = "title"
+label_template = "{prefix} {label}"
+
+[generic_search.providers.detail]
+steps = [
+  { url = "{base_url}/rest/v2/items/{id}" },
+  { url = "{base_url}/rest/v2/items/{id}/contacts",   assign = "_contacts" },
+  { url = "{base_url}/rest/v2/items/{id}/parameters", assign = "_parameters" },
+  { url = "{base_url}/rest/v2/units",                 assign = "_units" }
+]
+transforms = [
+  { dotted = "rdmo_generic_instrument_search.providers.transforms.o2aregistry:add_contacts_from_o2a" },
+  { dotted = "rdmo_generic_instrument_search.providers.transforms.o2aregistry:add_parameters_with_units_from_o2a" }
+]
+
+[generic_search.providers.handler]
+ref = "o2areg"                  # references the handler defined above
+
+
+# --- GFZ GIPP (client-side filter over large JSON index + 1-step detail) ----
+[[generic_search.providers]]
+id_prefix   = "gfzgipp"
+engine      = "recipe"
+text_prefix = "GIPP:"
+base_url    = "https://gipp.gfz-potsdam.de/instruments"
+
+[generic_search.providers.search]
+mode             = "client_filter"
+url              = "{base_url}/index.json?limit=10000&program=MOSES"
+items_path       = "@"
+id_path          = "Instrument.id"
+label_path       = "Instrument.code"
+label_template   = "{prefix} {code}"
+filter_any_paths = ["Instrument.*"]   # scan these paths for a substring match
+
+[generic_search.providers.detail]
+steps = [
+  { url = "{base_url}/rest/{id}.json" }
+]
+
+
+# --- Wikidata (SPARQL entity search + flatten detail) -----------------------
+[[generic_search.providers]]
+id_prefix   = "wdtype"
+engine      = "recipe"
+text_prefix = "WD:"
+base_url    = "https://www.wikidata.org"
+max_hits    = 30
+
+[generic_search.providers.search]
+mode     = "sparql"
+endpoint = "https://query.wikidata.org/sparql"
+root_qid = "Q2041172"     # measuring instrument
+# lang   = "en"           # override defaults.recipe.lang if needed
+query = """
+SELECT ?item ?itemLabel ?itemDescription WHERE {
+  SERVICE wikibase:mwapi {
+    bd:serviceParam wikibase:endpoint "www.wikidata.org" .
+    bd:serviceParam wikibase:api "EntitySearch" .
+    bd:serviceParam mwapi:search "{query}" .
+    bd:serviceParam mwapi:language "{lang}" .
+    bd:serviceParam mwapi:limit "30" .
+    ?item wikibase:apiOutputItem mwapi:item .
+  }
+  ?item wdt:P279* wd:{root_qid} .
+  FILTER NOT EXISTS { ?item wdt:P361 ?whole }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],{lang},en,de". }
+}
+"""
+items_path     = "results.bindings"
+id_path        = "item.value"          # full IRI -> provider normalizes to Qxxxx
+label_path     = "itemLabel.value"
+label_template = "{prefix} {label}"
+
+[generic_search.providers.detail]
+steps = [
+  { url = "{base_url}/w/api.php?action=wbgetentities&ids={id}&languages=en|de&format=json" }
+]
+transforms = [
+  { dotted = "rdmo_generic_instrument_search.providers.transforms:wikidata_flatten" }
+]
+
+
+# --- Example API (template) --------------------------------------------------
+[[generic_search.providers]]
+id_prefix   = "example"
+engine      = "recipe"
+text_prefix = "Example:"
+base_url    = "https://example.com/api/v1/instruments"
+
+[generic_search.providers.search]
+mode           = "server"
+url            = "{base_url}/search?q={query}"
+items_path     = "data"
+id_path        = "id"
+label_path     = "attributes.long_name || attributes.short_name"
+label_template = "{prefix} {label}"
+
+[generic_search.providers.detail]
+steps = [
+  { url = "{base_url}/items/{id}" },
+  { url = "{base_url}/items/{id}/contacts",  assign = "_contacts" }
+]
+# transforms = [ { dotted = "your.module:your_transform", kwargs = { } } ]
+
+[generic_search.providers.handler]
+ref = "example"
