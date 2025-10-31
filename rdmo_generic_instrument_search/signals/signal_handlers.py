@@ -13,14 +13,11 @@ logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Value)
 def post_save_project_values(sender, instance, **kwargs):
-    # ignore internal updates
+    # ignore autocomplete updates
     if _is_muted():
         return
 
     if instance is None:
-        return
-    if instance.external_id is None:
-        # this is common for values we create from mapped attributes; keep it quiet
         return
 
     logger.debug("Triggering post_save_project_values")

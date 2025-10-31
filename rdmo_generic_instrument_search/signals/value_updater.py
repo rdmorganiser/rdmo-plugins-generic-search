@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 from django.db import transaction
@@ -31,6 +32,22 @@ def _normalize_scalar(v: Any) -> Any:
     if isinstance(v, (int, float, bool)):
         return v
     return v if v is None else str(v)
+
+
+def build_clear_payload(attribute_mapping: Mapping[str, str]) -> dict[str, object]:
+    """
+    Return a payload that clears all mapped attributes:
+      - scalar targets -> ""
+      - list targets   -> []
+    We infer list-ness from mapping keys that contain '[]' (e.g. 'aliases[]', 'parameters[].name').
+    """
+    clear: dict[str, object] = {}
+    for path, attribute_uri in attribute_mapping.items():
+        if "[]" in path:
+            clear[attribute_uri] = []
+        else:
+            clear[attribute_uri] = ""  # updater treats "" as delete
+    return clear
 
 
 def _collection_shape(instance, attribute) -> str | None:
