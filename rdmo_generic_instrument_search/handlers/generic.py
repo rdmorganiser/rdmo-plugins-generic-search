@@ -11,23 +11,23 @@ logger = logging.getLogger("rdmo.generic_search.handlers")
 _PROVIDERS = build_providers()
 
 
-@dataclass
+@dataclass(slots=True)
 class GenericDetailHandler:
-    """One handler to rule them all: delegates to providers selected by id_prefix."""
+    """Delegates detail retrieval to a provider chosen by id_prefix, then maps fields via JMESPath."""
 
-    id_prefix: str
+    name: str
     catalog_uri: str
     auto_complete_field_uri: str
     attribute_mapping: dict[str, str]
 
     def handle(self, external_id: str) -> dict:
         try:
-            provider = _PROVIDERS[self.id_prefix]
+            provider = _PROVIDERS[self.name]
         except KeyError as e:
-            logger.warning("Unknown provider for id_prefix=%s", self.id_prefix)
+            logger.warning("Unknown provider for id_prefix=%s", self.name)
             raise e from e
         doc = provider.detail(external_id)
         if not doc:
-            logger.debug("Empty detail document for %s:%s", self.id_prefix, external_id)
+            logger.debug("Empty detail document for %s:%s", self.name, external_id)
             return {}
         return map_jamespath_to_attribute_uri(self.attribute_mapping, doc)
