@@ -6,15 +6,22 @@ from django.dispatch import receiver
 from rdmo.projects.models import Value
 
 from rdmo_generic_instrument_search.signals.handler_post_save import handle_post_save
+from rdmo_generic_instrument_search.signals.utils import _is_muted
 
 logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=Value)
 def post_save_project_values(sender, instance, **kwargs):
+    # ignore internal updates
+    if _is_muted():
+        return
+
     if instance is None:
         return
     if instance.external_id is None:
+        # this is common for values we create from mapped attributes; keep it quiet
         return
+
     logger.debug("Triggering post_save_project_values")
     handle_post_save(instance)
