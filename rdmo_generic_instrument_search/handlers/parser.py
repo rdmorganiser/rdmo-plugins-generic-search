@@ -2,7 +2,7 @@ import logging
 
 import jmespath
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rdmo.generic_search.handlers")
 
 
 def map_jamespath_to_attribute_uri(attribute_mapping: dict, data: dict) -> dict:

@@ -1,7 +1,7 @@
-[InstrumentsOptionSetProvider]
+[GenericSearchProvider]
 min_search_len = 3
 
-[[InstrumentsOptionSetProvider.providers.ExampleInstrumentProvider]]
+[[GenericSearchProvider.providers.ExampleInstrumentProvider]]
 id_prefix = "example"
 text_prefix = "Example: "
 base_url = "https://example.com/api/v1/instruments"

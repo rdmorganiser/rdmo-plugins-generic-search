@@ -11,7 +11,7 @@ from rdmo_generic_instrument_search.client import _sparql_post_json, fetch_json
 
 from .base import BaseInstrumentProvider  # jmespath helper via self._jp
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rdmo.generic_search.providers")
 
 
 # -------------------------------

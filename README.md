@@ -1,7 +1,7 @@
 # RDMO Instrument search optionset provider
 
 This optionset provider allows you to query several instrument databases at the
-same time. Additional questions can be filled in automatically with informations
+same time. Additional questions can be filled in automatically with information
 from the instrument database entries. To use this feature an attribute mapping must be
 configured.
 
@@ -35,7 +35,7 @@ Add the plugin to the `OPTIONSET_PROVIDERS` in `config/settings/local.py`:
 
 ```python
 OPTIONSET_PROVIDERS = [
-    ('instrument_search', _('Instrument search'), 'rdmo_generic_instrument_search.providers.InstrumentsOptionSetProvider'),
+    ('instrument_search', _('Instrument search'), 'rdmo_generic_instrument_search.providers.GenericSearchProvider'),
 ]
 ```
 
@@ -51,7 +51,7 @@ option for optionsets.
 ## Configuration
 
 With `config.toml` the providers which should be used can be configured. The
-`InstrumentsOptionSetProvider` aggregates the results of the configured providers.
+`GenericSearchProvider` aggregates the results of the configured providers.
 
 To automatically fill out questions with results of the matching sensor,
 attribute mapping for the specific catalog(s) must be configured in the
@@ -69,13 +69,13 @@ INSTRUMENT_SEARCH_PROVIDER_CONFIG_FILE_PATH = BASE_DIR / 'plugins' / 'instrument
 ### Configuration: Providers
 
 ```toml
-[InstrumentsOptionSetProvider]
-min_search_len = 3 
+[GenericSearchProvider]
+min_search_len = 3
 
 
-[[InstrumentsOptionSetProvider.providers.ExampleInstrumentProvider]]
-id_prefix = "example" 
-text_prefix = "Example: " 
+[[GenericSearchProvider.providers.ExampleInstrumentProvider]]
+id_prefix = "example"
+text_prefix = "Example: "
 base_url = "https://example.com/api/v1/instruments"
 ```
 
@@ -93,12 +93,12 @@ In conclusion, every provider has the following options:
   registry
 - `max_hits` defaults to `10` and limits the results to display
 - `base_url` the API URL of the used instance, must be set for the
-  `InstrumentsOptionSetProvider`
+  `GenericSearchProvider`
 
 ### Configuration: Handlers
 
-Handlers, or signal handlers, can be used to fill out questions with the search result 
-automatically via a pre-configured attribute mapping. 
+Handlers, or signal handlers, can be used to fill out questions with the search result
+automatically via a pre-configured attribute mapping.
 For every provider a handler is implemented,
 which can request additional information from the database to answer questions.
 
@@ -108,7 +108,7 @@ configure an attribute mapping.
 ```toml
 [handlers.ExampleInstrumentSearchHandler]
 [[handlers.ExampleInstrumentSearchHandler.backends]]
-id_prefix = "example" 
+id_prefix = "example"
 base_url = "https://example.com/api/v1/instruments"
 [[handlers.ExampleInstrumentSearchHandler.catalogs]]
 catalog_uri = "http://example.com/terms/questions/test-instrument-search"

@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 from rdmo_generic_instrument_search.client import fetch_json
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rdmo.generic_search.providers")
 
 
 @dataclass(kw_only=True, slots=True)

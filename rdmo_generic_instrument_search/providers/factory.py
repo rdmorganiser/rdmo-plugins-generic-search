@@ -4,11 +4,11 @@ from rdmo_generic_instrument_search.config_utils import load_config_from_setting
 
 from .recipe import InstrumentSearchProvider
 
-CONFIG_KEY = "InstrumentsOptionSetProvider"
+CONFIG_KEY = "GenericSearchProvider"
 
 
 def build_providers() -> dict[str, InstrumentSearchProvider]:
-    cfg = load_config_from_settings().get("InstrumentsOptionSetProvider", {}) or {}
+    cfg = load_config_from_settings().get("GenericSearchProvider", {}) or {}
     result: dict[str, InstrumentSearchProvider] = {}
     for class_name, providers in (cfg.get("providers") or {}).items():
         for provider_entry in providers:

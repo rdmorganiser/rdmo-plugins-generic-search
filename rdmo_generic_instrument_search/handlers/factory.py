@@ -5,7 +5,7 @@ import logging
 from rdmo_generic_instrument_search.config_utils import load_config_from_settings
 from rdmo_generic_instrument_search.handlers.generic import GenericDetailHandler
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rdmo.generic_search.handlers.factory")
 
 
 def build_handlers_by_catalog() -> dict:

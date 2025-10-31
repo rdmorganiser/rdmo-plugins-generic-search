@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from rdmo_generic_instrument_search.handlers.parser import map_jamespath_to_attribute_uri
 from rdmo_generic_instrument_search.providers.factory import build_providers
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rdmo.generic_search.handlers")
 
 _PROVIDERS = build_providers()
 

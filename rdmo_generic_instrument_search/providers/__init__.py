@@ -1,1 +1,1 @@
-from .meta import InstrumentOptionSetProvider as InstrumentOptionSetProvider
+from .meta import GenericSearchProvider as GenericSearchProvider
