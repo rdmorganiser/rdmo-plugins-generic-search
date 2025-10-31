@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 # -------------------------------
 
 
-@dataclass
-class SearchSpec:
+@dataclass(slots=True)
+class SearchConfig:
     # modes: "server" | "client_filter" | "sparql"
     mode: str
 
@@ -39,7 +39,7 @@ class SearchSpec:
     root_qid: str | None = None
 
     @classmethod
-    def from_dict(cls, data) -> SearchSpec:
+    def from_dict(cls, data) -> SearchConfig:
         return cls(
             mode=data["mode"],
             url=data.get("url", ""),
@@ -55,17 +55,36 @@ class SearchSpec:
         )
 
 
-@dataclass
-class DetailStep:
+@dataclass(slots=True)
+class FetchStep:
     url: str
     merge_included: bool = False
     assign: str | None = None
 
+    @classmethod
+    def from_dict(cls, data: dict | None) -> FetchStep:
+        if not data:
+            raise ValueError("FetchStep.from_dict requires a mapping")
+        return cls(
+            url=data["url"],
+            merge_included=bool(data.get("merge_included")),
+            assign=data.get("assign"),
+        )
 
-@dataclass
-class TransformSpec:
+
+@dataclass(slots=True)
+class Transform:
     dotted: str  # "pkg.mod:func" or "pkg.mod.func"
     kwargs: dict[str, Any] | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> Transform:
+        if not data:
+            raise ValueError("Transform.from_dict requires a mapping")
+        return cls(
+            dotted=data["dotted"],
+            kwargs=data.get("kwargs"),
+        )
 
 
 # -------------------------------
@@ -73,17 +92,38 @@ class TransformSpec:
 # -------------------------------
 
 
-class RecipeInstrumentProvider(BaseInstrumentProvider):
+@dataclass(slots=True)
+class InstrumentSearchProvider(BaseInstrumentProvider):
     # These can be provided as dicts (legacy) or as dataclasses (preferred).
-    search_spec: SearchSpec | dict | None = field(default=None, repr=False)
-    detail_steps: list[DetailStep] | list[dict] | None = field(default=None, repr=False)
-    transforms: list[TransformSpec] | list[dict] | None = field(default=None, repr=False)
+    search_config: SearchConfig | dict | None = field(default=None, repr=False)
+    fetch_steps: list[FetchStep] | list[dict] | None = field(default=None, repr=False)
+    transforms: list[Transform] | list[dict] | None = field(default=None, repr=False)
+
+    @classmethod
+    def from_dict(cls, data) -> InstrumentSearchProvider:
+        search = data.get("search")
+        steps = data.get("steps") or []
+        transforms = data.get("transforms") or []
+
+        return cls(
+            id_prefix=data.get("id_prefix"),
+            base_url=data.get("base_url"),
+            text_prefix=data.get("text_prefix"),
+            max_hits=data.get("max_hits") or 10,
+            search_url=data.get("search_url"),
+            search_items_path=data.get("search_items_path"),
+            search_id_path=data.get("search_id_path"),
+            search_label_path=data.get("search_label_path"),
+            search_config=SearchConfig.from_dict(search) or search,
+            fetch_steps=[FetchStep.from_dict(step) for step in steps] or None,
+            transforms=[Transform.from_dict(t) for t in transforms] or None,
+        )
 
     # -------------------------------
     # SEARCH
     # -------------------------------
     def search(self, query: str) -> list[dict]:
-        spec = self._ensure_search_spec(self.search_spec)
+        spec = self._ensure_search_spec(self.search_config)
         if not query or not spec:
             return []
 
@@ -104,15 +144,15 @@ class RecipeInstrumentProvider(BaseInstrumentProvider):
         logger.warning("Unknown search mode %r for provider %s", mode, self.id_prefix)
         return []
 
-    def _search_server(self, query: str, spec: SearchSpec) -> list[dict]:
+    def _search_server(self, query: str, spec: SearchConfig) -> list[dict]:
         if not spec.url:
             return []
         url = spec.url.format(base_url=self.base_url, query=quote(query))
         doc = fetch_json(url)
         items = self._jp(spec.items_path, doc) or []
-        return self._items_to_options(items, spec)
+        return self._map_items_to_options(items, spec)
 
-    def _search_client_filter(self, query: str, spec: SearchSpec) -> list[dict]:
+    def _search_client_filter(self, query: str, spec: SearchConfig) -> list[dict]:
         if not spec.url:
             return []
         url = spec.url.format(base_url=self.base_url, query=quote(query))
@@ -122,20 +162,20 @@ class RecipeInstrumentProvider(BaseInstrumentProvider):
         fpaths = spec.filter_any_paths or []
         filtered = []
         for it in items:
-            if any(self._contains(it, p, q) for p in fpaths):
+            if any(self._matches_query_at_path(it, p, q) for p in fpaths):
                 filtered.append(it)
             if len(filtered) >= self.max_hits:
                 break
-        return self._items_to_options(filtered, spec)
+        return self._map_items_to_options(filtered, spec)
 
-    def _search_sparql(self, query: str, spec: SearchSpec) -> list[dict]:
+    def _search_sparql(self, query: str, spec: SearchConfig) -> list[dict]:
         """
         Execute a SPARQL query (e.g. Wikidata).
         Required: spec.endpoint, spec.query
         Optional: spec.lang, spec.root_qid, items_path/id_path/label_path/label_template
         """
         if not spec.endpoint or not spec.query:
-            logger.warning("SPARQL search requires endpoint and query in SearchSpec")
+            logger.warning("SPARQL search requires endpoint and query in SearchConfig")
             return []
 
         lang = spec.lang or getattr(settings, "LANGUAGE_CODE", "en") or "en"
@@ -145,13 +185,13 @@ class RecipeInstrumentProvider(BaseInstrumentProvider):
 
         rows = _sparql_post_json(spec.endpoint, sparql)
         items = self._jp(spec.items_path or "results.bindings", rows) or []
-        return self._items_to_options(items, spec, normalize_wikidata_ids=True)
+        return self._map_items_to_options(items, spec, normalize_wikidata_ids=True)
 
     # -------------------------------
     # DETAIL
     # -------------------------------
     def detail(self, remote_id: str) -> dict:
-        steps = self._ensure_detail_steps(self.detail_steps)
+        steps = self._ensure_detail_steps(self.fetch_steps)
         transforms = self._ensure_transforms(self.transforms)
 
         doc: dict[str, Any] = {}
@@ -186,35 +226,47 @@ class RecipeInstrumentProvider(BaseInstrumentProvider):
     # -------------------------------
     # Helpers
     # -------------------------------
-    def _items_to_options(self, items: list, spec: SearchSpec, *, normalize_wikidata_ids: bool = False) -> list[dict]:
+    def _map_items_to_options(self, items: list, spec: SearchConfig, *, normalize_wikidata_ids: bool = False) -> list[dict]:
         out: list[dict] = []
         id_path = spec.id_path
         label_path = spec.label_path
         label_tpl = spec.label_template or "{label}"
 
+        if not id_path:
+            return out
+
         for it in items[: self.max_hits]:
             rid = self._jp(id_path, it)
-            lbl = self._jp(label_path, it)
-
-            if not rid or (lbl is None and not label_tpl):
+            lbl = self._jp(label_path, it) if label_path else None
+            if rid is None:
                 continue
 
+            # keep ids printable & stable
+            if isinstance(rid, (int, float)):
+                rid = str(rid)
+
             if normalize_wikidata_ids and isinstance(rid, str):
-                rid = self._qid_from_iri(rid)
+                rid = self._qid_from_entity_iri(rid)
 
             prefix = (self.text_prefix or "").strip()
-            text = label_tpl.format(prefix=prefix, label=lbl or "", code=self._jp("Instrument.code", it) or "").strip()
-            out.append({"id": f"{self.id_prefix}:{rid}", "text": text})
+            # template stays flexible; missing tokens become empty string
+            text = label_tpl.format(
+                prefix=prefix,
+                label=lbl or "",
+                code=self._jp("Instrument.code", it) or "",
+            ).strip()
+
+            out.append({"id": f"{self.id_prefix}:{rid}", "text": text or f"{self.id_prefix}:{rid}"})
         return out
 
-    def _contains(self, item: dict, path: str, q: str) -> bool:
+    def _matches_query_at_path(self, item: dict, path: str, q: str) -> bool:
         val = self._jp(path, item)
         if val is None:
             return False
         return q in str(val).lower()
 
     @staticmethod
-    def _qid_from_iri(value: str) -> str:
+    def _qid_from_entity_iri(value: str) -> str:
         # e.g. "http://www.wikidata.org/entity/Q123" → "Q123"
         if "/entity/" in value:
             return value.rsplit("/", 1)[-1]
@@ -234,52 +286,33 @@ class RecipeInstrumentProvider(BaseInstrumentProvider):
     # ----- coercion helpers (accept dicts or dataclasses) -----
 
     @staticmethod
-    def _ensure_search_spec(spec: SearchSpec | dict | None) -> SearchSpec | None:
+    def _ensure_search_spec(spec: SearchConfig | dict | None) -> SearchConfig | None:
         if spec is None:
             return None
-        if isinstance(spec, SearchSpec):
+        if isinstance(spec, SearchConfig):
             return spec
         if isinstance(spec, dict):
-            return SearchSpec(
-                mode=spec.get("mode", "server"),
-                url=spec.get("url"),
-                items_path=spec.get("items_path"),
-                id_path=spec.get("id_path"),
-                label_path=spec.get("label_path"),
-                label_template=spec.get("label_template"),
-                filter_any_paths=spec.get("filter_any_paths"),
-                endpoint=spec.get("endpoint"),
-                query=spec.get("query"),
-                lang=spec.get("lang"),
-                root_qid=spec.get("root_qid"),
-            )
+            return SearchConfig.from_dict(spec)
         raise TypeError(f"Unsupported search_spec type: {type(spec)!r}")
 
     @staticmethod
-    def _ensure_detail_steps(steps: list[DetailStep] | list[dict] | None) -> list[DetailStep]:
+    def _ensure_detail_steps(steps: list[FetchStep] | list[dict] | None) -> list[FetchStep]:
         if not steps:
             return []
-        if isinstance(steps, list) and all(isinstance(s, DetailStep) for s in steps):
+        if isinstance(steps, list) and all(isinstance(s, FetchStep) for s in steps):
             return steps  # already typed
-        # assume list[dict]
-        out: list[DetailStep] = []
-        for s in steps:  # type: ignore[assignment]
-            out.append(
-                DetailStep(
-                    url=s["url"],
-                    merge_included=bool(s.get("merge_included")),
-                    assign=s.get("assign"),
-                )
-            )
+        out: list[FetchStep] = []
+        for step in steps:  # type: ignore[assignment]
+            out.append(FetchStep.from_dict(step))
         return out
 
     @staticmethod
-    def _ensure_transforms(trs: list[TransformSpec] | list[dict] | None) -> list[TransformSpec]:
-        if not trs:
+    def _ensure_transforms(transforms: list[Transform] | list[dict] | None) -> list[Transform]:
+        if not transforms:
             return []
-        if isinstance(trs, list) and all(isinstance(t, TransformSpec) for t in trs):
-            return trs
-        out: list[TransformSpec] = []
-        for t in trs:  # type: ignore[assignment]
-            out.append(TransformSpec(dotted=t["dotted"], kwargs=t.get("kwargs")))
+        if isinstance(transforms, list) and all(isinstance(t, Transform) for t in transforms):
+            return transforms
+        out: list[Transform] = []
+        for transform in transforms:  # type: ignore[assignment]
+            out.append(Transform.from_dict(transform))
         return out
