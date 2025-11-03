@@ -10,6 +10,7 @@ from django.conf import settings
 from rdmo_generic_instrument_search.client import _sparql_post_json, fetch_json
 
 from .base import BaseInstrumentProvider  # jmespath helper via self._jp
+from .transforms.wikidata import is_instrument, pick_label, wbgetentities, wbsearchentities
 
 logger = logging.getLogger("rdmo.generic_search.providers.recipe")
 
@@ -21,7 +22,7 @@ logger = logging.getLogger("rdmo.generic_search.providers.recipe")
 
 @dataclass(slots=True)
 class SearchConfig:
-    # modes: "server" | "client_filter" | "sparql"
+    # modes: "server" | "client_filter" | "sparql" | "wikidata_action"
     mode: str
 
     # common (server/client_filter)
@@ -99,11 +100,12 @@ class InstrumentSearchProvider(BaseInstrumentProvider):
 
     @classmethod
     def from_dict(cls, data: dict) -> InstrumentSearchProvider:
+        id_prefix = data["id_prefix"]
         search = SearchConfig.from_dict(data["search"])
         detail = data["detail"]
         steps = [FetchStep.from_dict(s) for s in (detail.get("steps") or [])]
         if not steps:
-            raise ValueError("detail.steps must be a non-empty array")
+            raise ValueError(f"{id_prefix} detail.steps must be a non-empty array")
         transforms = [Transform.from_dict(t) for t in (detail.get("transforms") or [])]
 
         return cls(
@@ -111,6 +113,7 @@ class InstrumentSearchProvider(BaseInstrumentProvider):
             base_url=data.get("base_url", ""),
             text_prefix=data.get("text_prefix"),
             max_hits=int(data.get("max_hits") or 10),
+            available=data.get("available", True),
             search_config=search,
             fetch_steps=steps,
             transforms=transforms or None,
@@ -131,6 +134,8 @@ class InstrumentSearchProvider(BaseInstrumentProvider):
             return self._search_client_filter(query, spec)
         if mode == "sparql":
             return self._search_sparql(query, spec)
+        if mode == "wikidata_action":
+            return self._search_wikidata_action(query, spec)
 
         logger.warning("Unknown search mode %r for provider %s", mode, self.id_prefix)
         return []
@@ -164,6 +169,31 @@ class InstrumentSearchProvider(BaseInstrumentProvider):
         rows = _sparql_post_json(spec.endpoint, sparql) or {}
         items = self._jp(spec.items_path or "results.bindings", rows) or []
         return self._items_to_options(items, spec, normalize_wikidata_ids=True)
+
+    def _search_wikidata_action(self, query: str, spec: SearchConfig) -> list[dict]:
+        lang = spec.lang or getattr(settings, "LANGUAGE_CODE", "en") or "en"
+        base = self.base_url or "https://www.wikidata.org"
+        root = spec.root_qid or "Q2041172"
+
+        qids = wbsearchentities(query, base_url=base, lang=lang, limit=self.max_hits * 3)  # small overfetch
+        if not qids:
+            return []
+
+        entities = wbgetentities(qids, base_url=base, lang=lang)
+
+        out: list[dict] = []
+        cache: dict[str, dict] = dict(entities)  # seed cache with what we already have
+        for qid, ent in entities.items():
+            if not ent:
+                continue
+            if not is_instrument(ent, base_url=base, lang=lang, root_qid=root, max_depth=5, _cache=cache):
+                continue
+            label = pick_label(ent, [lang, "en", "de"]) or qid
+            text = f"{(self.text_prefix or '').strip()} {label}".strip()
+            out.append({"id": f"{self.id_prefix}:{qid}", "text": text})
+            if len(out) >= self.max_hits:
+                break
+        return out
 
     # -------------------------------
     # DETAIL

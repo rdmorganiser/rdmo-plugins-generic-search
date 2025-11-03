@@ -57,6 +57,10 @@ def handle_post_save(instance):
     for handler in ALL_HANDLERS.get(instance.project.catalog.uri, []):
         if handler.name == id_prefix and handler.auto_complete_field_uri == instance.attribute.uri:
             mapped = handler.handle(external_id=external_id)  # provider detail inside
+            if not mapped:
+                logger.debug("Handler %s returned empty.", id_prefix)
+                continue
+
             if mapped.get("errors"):
                 logger.error("Handler %s returned errors: %s", id_prefix, mapped["errors"])
                 continue

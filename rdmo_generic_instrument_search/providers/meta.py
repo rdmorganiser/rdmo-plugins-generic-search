@@ -83,7 +83,7 @@ class GenericSearchProvider(Provider):
                         seen.add(oid)
                         results.append({"id": oid, "text": str(opt.get("text", oid))})
                         added += 1
-                logger.debug("generic-search: provider=%s added=%d total=%d", prefix, added, len(results))
+                # logger.debug("generic-search: provider=%s added=%d total=%d", prefix, added, len(results))
 
                 if self.search_context.max_total_hits is not None and len(results) >= self.search_context.max_total_hits:
                     for f2 in futures:

@@ -45,7 +45,7 @@
 		<questions>
 			<question dc:uri="http://example.com/terms/questions/search/instrument/search-optionset" order="0"/>
 			<question dc:uri="http://example.com/terms/questions/search/instrument/type" order="1"/>
-			<question dc:uri="http://example.com/terms/questions/search/instrument/name" order="2"/>
+			<question dc:uri="http://example.com/terms/questions/search/instrument/documentation" order="2"/>
 			<question dc:uri="http://example.com/terms/questions/search/instrument/serial" order="3"/>
 		</questions>
 		<conditions/>
@@ -179,19 +179,19 @@
 		<optionsets/>
 		<conditions/>
 	</question>
-	<question dc:uri="http://example.com/terms/questions/search/instrument/name">
+	<question dc:uri="http://example.com/terms/questions/search/instrument/documentation">
 		<uri_prefix>http://example.com/terms</uri_prefix>
-		<uri_path>search/instrument/name</uri_path>
+		<uri_path>search/instrument/documentation</uri_path>
 		<dc:comment/>
 		<attribute dc:uri="https://rdmorganiser.github.io/terms/domain/project/dataset/documentation"/>
 		<is_collection>False</is_collection>
 		<is_optional>False</is_optional>
 		<help lang="en"/>
-		<text lang="en">Name</text>
+		<text lang="en">Documentation</text>
 		<default_text lang="en"/>
 		<verbose_name lang="en"/>
 		<help lang="de"/>
-		<text lang="de">Name</text>
+		<text lang="de">Dokumentation</text>
 		<default_text lang="de"/>
 		<verbose_name lang="de"/>
 		<default_option/>

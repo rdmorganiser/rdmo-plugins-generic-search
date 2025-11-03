@@ -18,6 +18,7 @@ class BaseInstrumentProvider:
     # optional
     text_prefix: str | None = field(default=None, repr=False)
     max_hits: int = field(default=10, repr=False)
+    available: bool = field(default=True, repr=False)
 
     # Template hooks (stay optional; not required in __init__)
     search_url: str | None = field(default=None, repr=False)  # e.g. "{base_url}/devices?q={query}"

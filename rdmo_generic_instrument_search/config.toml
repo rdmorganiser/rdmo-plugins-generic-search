@@ -35,7 +35,7 @@ lang     = "en"                 # default language for SPARQL etc.
 #   - auto_complete_field_uri (the question used for the search widget)
 #   - attribute_mapping (JMESPath -> attribute URI)
 #
-[generic_search.handlers.o2areg]                   # handler "o2areg"
+[generic_search.handlers.o2areg]  # handler for o2a registry
 name = "o2areg"
 catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
 auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
@@ -46,6 +46,24 @@ auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/d
 "serialNumber"      = "https://rdmorganiser.github.io/terms/domain/project/dataset/id"
 "parameters[].name" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_description"
 "parameters[].unit" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_frequency"
+
+[generic_search.handlers.wdata]  # handler for wikidata
+catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
+auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
+
+[generic_search.handlers.wdata.attribute_mapping]
+# scalar fields with language fallbacks
+"entities.*[].labels.{lang}.value || entities.*[].labels.en.value || entities.*[].labels.de.value" = "https://rdmorganiser.github.io/terms/domain/project/dataset/description"
+"entities.*[].descriptions.{lang}.value || entities.*[].descriptions.en.value || entities.*[].descriptions.de.value" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_description"
+# the wikidata id
+"entities.*[].id" = "https://rdmorganiser.github.io/terms/domain/project/dataset/id"
+
+# list field with language fallbacks
+"entities.*[].aliases.{lang}[].value || entities.*[].aliases.en[].value || entities.*[].aliases.de[].value" = "http://example.org/terms/domain/instrument/type/aliases"
+
+# website (no language)
+"entities.*[].claims.P856[0].mainsnak.datavalue.value" = "https://rdmorganiser.github.io/terms/domain/project/dataset/documentation"
+
 
 # Example handler with array fields (shows how [] in mapping becomes list handling)
 [generic_search.handlers.example]
@@ -125,10 +143,33 @@ steps = [
   { url = "{base_url}/rest/{id}.json" }
 ]
 
+# --- Wikidata (Action API search + flatten detail)
+[[generic_search.providers]]
+id_prefix   = "wdata"
+engine      = "recipe"
+text_prefix = "WD:"
+base_url    = "https://www.wikidata.org"
+max_hits    = 30
+
+[generic_search.providers.search]
+mode     = "wikidata_action"   # ← use Action API instead of SPARQL
+root_qid = "Q2041172"          # measuring instrument
+lang     = "en"                # optional; defaults to generic_search.defaults.recipe.lang
+
+# map items (we build labels in code; id is QID)
+# no items_path/id_path/label_path needed for wikidata_action
+
+[generic_search.providers.detail]
+steps = [
+  { url = "{base_url}/w/api.php?action=wbgetentities&ids={id}&languages=en|de&format=json" }
+]
+transforms = [
+  { dotted = "rdmo_generic_instrument_search.providers.transforms:wikidata_flatten" }
+]
 
 # --- Wikidata (SPARQL entity search + flatten detail) -----------------------
 [[generic_search.providers]]
-id_prefix   = "wdtype"
+id_prefix   = "wdata_sparql"
 engine      = "recipe"
 text_prefix = "WD:"
 base_url    = "https://www.wikidata.org"
