@@ -208,6 +208,25 @@ transforms = [
   { dotted = "rdmo_generic_instrument_search.providers.transforms:wikidata_flatten" }
 ]
 
+# -- NOMAD API -------------------------------
+[[generic_search.providers]]
+id_prefix   = "nomad"
+engine      = "recipe"
+text_prefix = "NOMAD:"
+base_url    = "https://nomad-lab.eu/prod/v1/api/v1"
+
+[generic_search.providers.search]
+mode           = "server"
+url         = '{base_url}/entries?owner=public&json_query={{"results.eln.sections":["Instrument"],"results.eln.instruments:any":["{query}"]}}'
+items_path     = "data"
+id_path        = "entry_id"
+  label_path  = "results.eln.instruments[0] || entry_id"
+label_template = "{prefix} {label}"
+
+[generic_search.providers.detail]
+  steps = [
+    { url = "{base_url}/entries/{id}" }
+  ]
 
 # --- Example API (template) --------------------------------------------------
 [[generic_search.providers]]
