@@ -69,24 +69,21 @@ auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/d
 # ---- NOMAD handler and mapping --- #
 [generic_search.handlers.nomad]
 name = "nomad"
-catalog_uri = "http://example.com/terms/questions/test-instrument-search"
+catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
 auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
 
 [generic_search.handlers.nomad.attribute_mapping]
-# Long, descriptive text -> longName
-"results.eln.descriptions[0]" = "http://example.com/terms/domain/search/instrument/example/long-name"
+# Long / primary name – take the instrument name, fall back to ELN name or entry_name
+"results.eln.instruments[0] || results.eln.names[0] || entry_name" = "https://rdmorganiser.github.io/terms/domain/project/dataset/description"
 
-# Short label / name -> shortName
-"results.eln.names[0]" = "http://example.com/terms/domain/search/instrument/example/short-name"
+# Description / documentation – NOMAD’s ELN description (HTML string is fine, RDMO will store text)
+"results.eln.descriptions[0]" = "https://rdmorganiser.github.io/terms/domain/project/dataset/documentation"
 
-# Human-readable ID if available, otherwise fall back to entry_id
-"results.eln.lab_ids[0] || entry_id" = "http://example.com/terms/domain/search/instrument/example/serial"
+# Identifier / serial – use lab_id if present, otherwise fall back to NOMAD entry_id
+"results.eln.lab_ids[0] || entry_id" = "https://rdmorganiser.github.io/terms/domain/project/dataset/id"
 
-# All names (can include multiple section names) -> aliases list
-"results.eln.names[]" = "http://example.com/terms/domain/search/instrument/example/aliases"
-
-# All tags -> keywords list
-"results.eln.tags[]" = "http://example.com/terms/domain/search/instrument/example/keywords"
+# Aliases – all ELN names as aliases (similar idea to Wikidata aliases)
+"results.eln.names[]" = "http://example.org/terms/domain/instrument/type/aliases"
 
 
 # ----- Example handler with array fields (shows how [] in mapping becomes list handling) -------#
@@ -241,10 +238,10 @@ base_url    = "https://nomad-lab.eu/prod/v1/api/v1"
 
 [generic_search.providers.search]
 mode           = "server"
-url         = '{base_url}/entries?owner=public&json_query={{"results.eln.sections":["Instrument"],"results.eln.instruments:any":["{query}"]}}'
+url            = '{base_url}/entries?owner=public&json_query={{"results.eln.sections":["Instrument"],"results.eln.instruments:any":["{query}"]}}'
 items_path     = "data"
 id_path        = "entry_id"
-label_path  = "results.eln.instruments[0] || entry_id"
+label_path     = "results.eln.instruments[0] || results.eln.names[0] || entry_name"
 label_template = "{prefix} {label}"
 
 [generic_search.providers.detail]
