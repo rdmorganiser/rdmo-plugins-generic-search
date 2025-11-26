@@ -34,7 +34,8 @@ lang     = "en"                 # default language for SPARQL etc.
 #   - catalog_uri (the target catalog)
 #   - auto_complete_field_uri (the question used for the search widget)
 #   - attribute_mapping (JMESPath -> attribute URI)
-#
+
+# ---- O2Aregistry handler and mapping --- #
 [generic_search.handlers.o2areg]  # handler for o2a registry
 name = "o2areg"
 catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
@@ -47,6 +48,7 @@ auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/d
 "parameters[].name" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_description"
 "parameters[].unit" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_frequency"
 
+# ---- Wikidata handler and mapping --- #
 [generic_search.handlers.wdata]  # handler for wikidata
 catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
 auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
@@ -64,8 +66,30 @@ auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/d
 # website (no language)
 "entities.*[].claims.P856[0].mainsnak.datavalue.value" = "https://rdmorganiser.github.io/terms/domain/project/dataset/documentation"
 
+# ---- NOMAD handler and mapping --- #
+[generic_search.handlers.nomad]
+name = "nomad"
+catalog_uri = "http://example.com/terms/questions/test-instrument-search"
+auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
 
-# Example handler with array fields (shows how [] in mapping becomes list handling)
+[generic_search.handlers.nomad.attribute_mapping]
+# Long, descriptive text -> longName
+"results.eln.descriptions[0]" = "http://example.com/terms/domain/search/instrument/example/long-name"
+
+# Short label / name -> shortName
+"results.eln.names[0]" = "http://example.com/terms/domain/search/instrument/example/short-name"
+
+# Human-readable ID if available, otherwise fall back to entry_id
+"results.eln.lab_ids[0] || entry_id" = "http://example.com/terms/domain/search/instrument/example/serial"
+
+# All names (can include multiple section names) -> aliases list
+"results.eln.names[]" = "http://example.com/terms/domain/search/instrument/example/aliases"
+
+# All tags -> keywords list
+"results.eln.tags[]" = "http://example.com/terms/domain/search/instrument/example/keywords"
+
+
+# ----- Example handler with array fields (shows how [] in mapping becomes list handling) -------#
 [generic_search.handlers.example]
 name = "example"
 catalog_uri = "http://example.com/terms/questions/test-instrument-search"
@@ -220,7 +244,7 @@ mode           = "server"
 url         = '{base_url}/entries?owner=public&json_query={{"results.eln.sections":["Instrument"],"results.eln.instruments:any":["{query}"]}}'
 items_path     = "data"
 id_path        = "entry_id"
-  label_path  = "results.eln.instruments[0] || entry_id"
+label_path  = "results.eln.instruments[0] || entry_id"
 label_template = "{prefix} {label}"
 
 [generic_search.providers.detail]
