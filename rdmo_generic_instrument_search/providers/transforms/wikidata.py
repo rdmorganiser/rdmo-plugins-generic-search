@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from rdmo_generic_instrument_search.client import fetch_json
 
 DEFAULT_BASE = "https://www.wikidata.org"
-DEFAULT_LANGS = ["en", "de"]
+DEFAULT_LANGS = ("en", "de")
 Q_MEASURING_INSTRUMENT = "Q2041172"  # measuring instrument
 
 
