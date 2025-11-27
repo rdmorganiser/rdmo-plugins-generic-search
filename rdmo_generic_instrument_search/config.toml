@@ -25,19 +25,17 @@ lang     = "en"                 # default language for SPARQL etc.
 # ===================================================================
 # Handlers – map a provider’s detail document to RDMO attributes
 # ===================================================================
-# Use either a single inline config per handler family, or an array of configs:
-#   [generic_search.handlers.<name>]               # single config
-#   [[generic_search.handlers.<name>.config]]      # multiple configs
-#
-# Each config requires:
-#   - name (matched against "id_prefix" part of external_id)
-#   - catalog_uri (the target catalog)
-#   - auto_complete_field_uri (the question used for the search widget)
-#   - attribute_mapping (JMESPath -> attribute URI)
+# Handlers are keyed by the same id_prefix as their provider. Each handler
+# defines how to map a provider's detail response into RDMO attributes:
+#   [generic_search.handlers.<id_prefix>]
+#     catalog_uri = "..."                # catalog that should receive mapped values
+#     auto_complete_field_uri = "..."    # question URI that triggers this handler
+#     [generic_search.handlers.<id_prefix>.attribute_mapping]
+#     "json.path" = "https://.../attribute/uri"
 
 # ---- O2Aregistry handler and mapping --- #
 [generic_search.handlers.o2areg]  # handler for o2a registry
-name = "o2areg"
+name = "o2areg"  # redundant because the key is injected as name; kept for readability
 catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
 auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
 
@@ -50,6 +48,7 @@ auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/d
 
 # ---- Wikidata handler and mapping --- #
 [generic_search.handlers.wdata]  # handler for wikidata
+name = "wdata"
 catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
 auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
 
@@ -219,6 +218,9 @@ transforms = [
   { dotted = "rdmo_generic_instrument_search.providers.transforms:wikidata_flatten" }
 ]
 
+[generic_search.providers.handler]
+ref = "wdata"
+
 # --- Wikidata (SPARQL entity search + flatten detail) -----------------------
 [[generic_search.providers]]
 id_prefix   = "wdata_sparql"
@@ -260,6 +262,9 @@ transforms = [
   { dotted = "rdmo_generic_instrument_search.providers.transforms:wikidata_flatten" }
 ]
 
+[generic_search.providers.handler]
+ref = "wdata"
+
 #--- NOMAD API ---#
 [[generic_search.providers]]
 id_prefix   = "nomad"
@@ -279,6 +284,9 @@ label_template = "{prefix} {label}"
   steps = [
     { url = "{base_url}/entries/{id}" }
   ]
+
+[generic_search.providers.handler]
+ref = "nomad"
 
 #--- PIDINST local static ---#
 [[generic_search.providers]]
