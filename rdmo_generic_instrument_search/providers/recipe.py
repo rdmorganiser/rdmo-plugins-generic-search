@@ -31,7 +31,7 @@ class SearchConfig:
     id_path: str | None = None
     label_path: str | None = None
     label_template: str | None = None
-    filter_any_paths: list[str] | None = None  # client_filter
+    filter_any_paths: list[str] = field(default_factory=list)  # client_filter
 
     # SPARQL extras
     endpoint: str | None = None
@@ -103,19 +103,19 @@ class InstrumentSearchProvider(BaseInstrumentProvider):
         id_prefix = data["id_prefix"]
         search = SearchConfig.from_dict(data["search"])
         detail = data["detail"]
-        steps = [FetchStep.from_dict(s) for s in (detail.get("steps") or [])]
-        if not steps:
+        fetch_steps = [FetchStep.from_dict(s) for s in (detail.get("steps") or [])]
+        if not search.mode == "client_filter" and not fetch_steps:
             raise ValueError(f"{id_prefix} detail.steps must be a non-empty array")
         transforms = [Transform.from_dict(t) for t in (detail.get("transforms") or [])]
 
         return cls(
             id_prefix=data["id_prefix"],
-            base_url=data.get("base_url", ""),
-            text_prefix=data.get("text_prefix"),
+            base_url=data["base_url"],
+            text_prefix=data["text_prefix"],
             max_hits=int(data.get("max_hits") or 10),
             available=data.get("available", True),
             search_config=search,
-            fetch_steps=steps,
+            fetch_steps=fetch_steps,
             transforms=transforms or None,
         )
 
@@ -123,39 +123,45 @@ class InstrumentSearchProvider(BaseInstrumentProvider):
     # SEARCH
     # -------------------------------
     def search(self, query: str) -> list[dict]:
-        spec = self.search_config
-        if not query or not spec:
+        if not query or not self.search_config:
             return []
 
-        mode = spec.mode.lower()
+        if self.search_config.url is None:
+            url = self.base_url
+        else:
+            url = self.search_config.url.format(base_url=self.base_url, query=quote(query))
+
+        mode = self.search_config.mode.lower()
         if mode == "server":
-            return self._search_server(query, spec)
+            return self._search_server(url, self.search_config)
         if mode == "client_filter":
-            return self._search_client_filter(query, spec)
+            return self._search_client_filter(url, query, self.search_config)
         if mode == "sparql":
-            return self._search_sparql(query, spec)
+            return self._search_sparql(query, self.search_config)
         if mode == "wikidata_action":
-            return self._search_wikidata_action(query, spec)
+            return self._search_wikidata_action(query, self.search_config)
 
         logger.warning("Unknown search mode %r for provider %s", mode, self.id_prefix)
         return []
 
-    def _search_server(self, query: str, spec: SearchConfig) -> list[dict]:
-        url = spec.url.format(base_url=self.base_url, query=quote(query))
+    def fetch_and_search(self, url: str, items_path: str):
         doc = fetch_json(url) or {}
-        items = self._jp(spec.items_path, doc) or []
+        items = self._jp(items_path, doc) or []
+        return doc, items
+
+    def _search_server(self, url: str, spec: SearchConfig) -> list[dict]:
+        _doc, items = self.fetch_and_search(url, spec.items_path)
         return self._items_to_options(items, spec)
 
-    def _search_client_filter(self, query: str, spec: SearchConfig) -> list[dict]:
-        url = spec.url.format(base_url=self.base_url, query=quote(query))
-        doc = fetch_json(url) or {}
-        items = self._jp(spec.items_path, doc) or []
-        q = query.lower()
-        fpaths = spec.filter_any_paths or []
+    def _search_client_filter(self, url: str, query: str, spec: SearchConfig) -> list[dict]:
+        _doc, items = self.fetch_and_search(url, spec.items_path)
         filtered: list[Any] = []
-        for it in items:
-            if any(self._contains(it, p, q) for p in fpaths):
-                filtered.append(it)
+        for item in items:
+            if any(
+                    self._contains(item, filter_path,  query.lower())
+                    for filter_path in spec.filter_any_paths
+            ):
+                filtered.append(item)
                 if len(filtered) >= self.max_hits:
                     break
         return self._items_to_options(filtered, spec)
@@ -198,31 +204,76 @@ class InstrumentSearchProvider(BaseInstrumentProvider):
     # -------------------------------
     # DETAIL
     # -------------------------------
+    # in recipe.py, inside InstrumentSearchProvider
     def detail(self, remote_id: str) -> dict:
+        """
+        Fetch a detail document.
+
+        - Normal case: follow HTTP steps and merge JSON.
+        - Special case (PIDINST, or any static client_filter provider with no steps):
+          look up the record directly in the same JSON index used for search.
+        """
         doc: dict[str, Any] = {}
-        for step in self.fetch_steps or []:
-            url = step.url.format(base_url=self.base_url, id=remote_id)
-            part = fetch_json(url) or {}
 
-            if step.assign:
-                doc[step.assign] = part
-                continue
+        # --- Special case: static client_filter with no explicit detail steps ---
+        if (not self.fetch_steps) and self.search_config and self.search_config.mode == "client_filter":
 
-            if step.merge_included:
-                doc["included"] = [*doc.get("included", []), *part.get("included", [])]
+            # Re-use the search source; for pidinst this is the static file
+            if self.search_config.url:
+                url = self.search_config.url
+            else:
+                # fallback if someone uses base_url-only static config later
+                url = self.base_url
 
-            for k, v in part.items():
-                if k == "included" and not step.merge_included:
-                    doc["included"] = [*doc.get("included", []), *v]
-                else:
-                    doc[k] = v
+            _index, items = self.fetch_and_search(url, self.search_config.items_path or "@")
 
+            # Normalise single-record vs list
+            if isinstance(items, dict):
+                items = [items]
+
+            match: dict[str, Any] | None = None
+            for item in items:
+                rid = self._jp(self.search_config.id_path, item) if self.search_config.id_path else None
+                if rid is None:
+                    continue
+                rid_str = str(rid)
+                if rid_str == str(remote_id):
+                    match = item
+                    break
+
+            if not match:
+                logger.warning("No PIDINST record found for pid=%s", remote_id)
+                return {}
+
+            doc = match
+
+        # --- Normal HTTP multi-step case (unchanged) ---
+        else:
+            for step in self.fetch_steps or []:
+                url = step.url.format(base_url=self.base_url, id=remote_id)
+                part = fetch_json(url) or {}
+
+                if step.assign:
+                    doc[step.assign] = part
+                    continue
+
+                if step.merge_included:
+                    doc["included"] = [*doc.get("included", []), *part.get("included", [])]
+
+                for k, v in part.items():
+                    if k == "included" and not step.merge_included:
+                        doc["included"] = [*doc.get("included", []), *v]
+                    else:
+                        doc[k] = v
+
+        # --- Transforms (PIDINST normalize happens here) ---
         for t in self.transforms or []:
             fn = self._import_callable(t.dotted)
             try:
                 doc = fn(doc, **(t.kwargs or {})) or doc
             except Exception as e:
                 logger.warning("Transform %s failed: %s", t.dotted, e)
+
         return doc
 
     # -------------------------------
