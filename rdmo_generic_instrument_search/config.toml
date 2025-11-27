@@ -327,14 +327,14 @@ ref = "pidinst"
 id_prefix   = "b2inst"
 engine      = "recipe"
 text_prefix = "B2INST:"
-base_url    = "https://b2inst.gwdg.de/records"
+base_url    = "https://b2inst.gwdg.de/api/records"
 
 [generic_search.providers.search]
 mode           = "server"
 url            = "{base_url}/?q={query}&sort=mostrecent&page=1&size=10"
 items_path     = "hits.hits"
 id_path        = "id"
-label_path     = "metadata.title || metadata.titles[0].title || metadata.b2inst_attributes.Name"
+label_path     = "metadata.Name || metadata.b2inst_attributes.Name || metadata.title || metadata.titles[0].title"
 label_template = "{prefix} {label}"
 
 [generic_search.providers.detail]

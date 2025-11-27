@@ -50,9 +50,10 @@ def normalize_b2inst_record(doc: dict[str, Any]) -> dict[str, Any]:
 
     # Human-readable label
     name = _first_str(
+        metadata.get("Name"),
+        b2inst_attrs.get("Name"),
         metadata.get("title"),
         metadata.get("titles"),
-        b2inst_attrs.get("Name"),
         datacite.get("titles"),
     )
 
@@ -63,6 +64,7 @@ def normalize_b2inst_record(doc: dict[str, Any]) -> dict[str, Any]:
         or links.get("self")
         or metadata.get("landing_page")
         or doc.get("landing_page")
+        or metadata.get("LandingPage")
         or b2inst_attrs.get("LandingPage")
     )
 
