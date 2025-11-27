@@ -58,6 +58,11 @@ def _validate_provider_entry(idx: int, entry: dict[str, Any]) -> None:
         if mode in {"server", "client_filter"}:
             for key in ("url", "items_path", "id_path"):
                 if not search.get(key):
+                    if (
+                        key == "url" and
+                        (entry['base_url'].startswith("static://") or entry['base_url'].startswith("file://"))
+                    ):
+                        continue
                     raise ValueError(f"[{prefix}] search.{key} is required for mode={mode}")
         if mode == "sparql":
             for key in ("endpoint", "query", "id_path"):
