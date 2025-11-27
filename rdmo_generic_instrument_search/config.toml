@@ -105,6 +105,18 @@ auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/d
 "b2inst_attributes.MeasuredVariable[]"  = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_description"
 # "pidinst_attributes.parameters[].unit"  = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_frequency"
 
+# ---- B2INST handler and mapping --- #
+[generic_search.handlers.b2inst]
+name = "b2inst"
+catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
+auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
+
+[generic_search.handlers.b2inst.attribute_mapping]
+"b2inst_attributes.Description || datacite_attributes.descriptions[*].description || name" = "https://rdmorganiser.github.io/terms/domain/project/dataset/description"
+"landing_page" = "https://rdmorganiser.github.io/terms/domain/project/dataset/documentation"
+"pid" = "https://rdmorganiser.github.io/terms/domain/project/dataset/id"
+"b2inst_attributes.Model.modelName" = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_description"
+
 # ----- Example handler with array fields (shows how [] in mapping becomes list handling) -------#
 [generic_search.handlers.example]
 name = "example"
@@ -309,6 +321,32 @@ transforms = [
 
 [generic_search.providers.handler]
 ref = "pidinst"
+
+#--- B2INST API ---#
+[[generic_search.providers]]
+id_prefix   = "b2inst"
+engine      = "recipe"
+text_prefix = "B2INST:"
+base_url    = "https://b2inst.gwdg.de/records"
+
+[generic_search.providers.search]
+mode           = "server"
+url            = "{base_url}/?q={query}&sort=mostrecent&page=1&size=10"
+items_path     = "hits.hits"
+id_path        = "id"
+label_path     = "metadata.title || metadata.titles[0].title || metadata.b2inst_attributes.Name"
+label_template = "{prefix} {label}"
+
+[generic_search.providers.detail]
+steps = [
+  { url = "{base_url}/{id}" }
+]
+transforms = [
+  { dotted = "rdmo_generic_instrument_search.providers.transforms.b2inst:normalize_b2inst_record" }
+]
+
+[generic_search.providers.handler]
+ref = "b2inst"
 
 
 # --- Example API (template) --------------------------------------------------
