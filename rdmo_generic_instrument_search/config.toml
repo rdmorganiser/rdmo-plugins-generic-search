@@ -85,6 +85,25 @@ auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/d
 # Aliases – all ELN names as aliases (similar idea to Wikidata aliases)
 "results.eln.names[]" = "http://example.org/terms/domain/instrument/type/aliases"
 
+# ---- PIDINST handler and mapping --- #
+[generic_search.handlers.pidinst]
+name = "pidinst"
+catalog_uri = "http://example.com/terms/questions/generic-instrument-search-example-catalog"
+auto_complete_field_uri = "https://rdmorganiser.github.io/terms/domain/project/dataset/title"
+
+[generic_search.handlers.pidinst.attribute_mapping]
+# Main name / type-like label for the instrument
+"datacite_attribute.descriptions[*].description ||  b2inst_attributes.Description" = "https://rdmorganiser.github.io/terms/domain/project/dataset/description"
+#"datacite_attribute.titles[*].title"
+# Free-text documentation / abstract
+"landing_page" = "https://rdmorganiser.github.io/terms/domain/project/dataset/documentation"
+
+# Identifier (PID/DOI)
+"pid"                             = "https://rdmorganiser.github.io/terms/domain/project/dataset/id"
+
+# Future PIDINST-specific parameter fields (extend once you have them):
+"b2inst_attributes.MeasuredVariable[]"  = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_description"
+# "pidinst_attributes.parameters[].unit"  = "https://rdmorganiser.github.io/terms/domain/project/dataset/usage_frequency"
 
 # ----- Example handler with array fields (shows how [] in mapping becomes list handling) -------#
 [generic_search.handlers.example]
@@ -229,7 +248,7 @@ transforms = [
   { dotted = "rdmo_generic_instrument_search.providers.transforms:wikidata_flatten" }
 ]
 
-# -- NOMAD API -------------------------------
+#--- NOMAD API ---#
 [[generic_search.providers]]
 id_prefix   = "nomad"
 engine      = "recipe"
@@ -248,6 +267,49 @@ label_template = "{prefix} {label}"
   steps = [
     { url = "{base_url}/entries/{id}" }
   ]
+
+#--- PIDINST local static ---#
+[[generic_search.providers]]
+id_prefix   = "pidinst"
+engine      = "recipe"
+text_prefix = "PIDINST:"
+max_hits    = 25
+
+[generic_search.providers.search]
+mode = "client_filter"
+# local static file URL
+url = "static://instrument_search/pidinst_all.json"
+# JSON is a list of instruments at top level
+items_path = "@"
+id_path = "pid"
+
+# label: prefer 'name', fall back to DataCite title or pid
+label_path = "name || pid || datacite_attributes.titles[0].title"
+label_template = "{prefix} {label}"
+
+# Fields for full-text filtering
+filter_any_paths = [
+  "pid",
+  "name",
+  "owner",
+  "manufacturer",
+  "instrument_type",
+  "model",
+  "measured_variable",
+  "datacite_attributes.titles[].title"
+]
+
+[generic_search.providers.detail]
+steps = [
+  { url = "{base_url}" }
+]
+transforms = [
+  { dotted = "rdmo_generic_instrument_search.providers.transforms.pidinst:normalize_pidinst_record" }
+]
+
+[generic_search.providers.handler]
+ref = "pidinst"
+
 
 # --- Example API (template) --------------------------------------------------
 [[generic_search.providers]]
