@@ -41,7 +41,10 @@ class GenericDetailHandler:
             raise e from e
         doc = provider.detail(external_id)
         if not doc:
-            logger.debug("Empty detail document for %s:%s", self.name, external_id)
+            logger.error("Empty detail document for %s:%s", self.name, external_id)
+            return {}
+        elif 'errors' in doc:
+            logger.error('\n'.join(map(str, doc['errors'])))
             return {}
 
         lang = translation.get_language() or "en"  # current request locale (thread-local)
